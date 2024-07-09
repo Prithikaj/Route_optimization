@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Find Nearest Hospital</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <style>
+        body {
+            padding-top: 50px;
+        }
+        .container {
+            max-width: 600px;
+        }
+        #map {
+            height: 400px;
+        }
+        .ambulance-icon {
+            width: 25px;
+            height: 25px;
+            background: url('https://image.flaticon.com/icons/png/128/883/883407.png') no-repeat center center;
+            background-size: contain;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Find Nearest Hospital</h1>
+        <form id="locationForm" class="mt-5">
+            <div class="form-group">
+                <label for="currentLocation">Current Location (Node):</label>
+                <input type="number" class="form-control" id="currentLocation" placeholder="Enter current location node" required>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">Find Nearest Hospital</button>
+        </form>
+        <div id="result" class="mt-4"></div>
+        <div id="map" class="mt-4"></div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script>
+        $(document).ready(function() {
+            var map = L.map('map').setView([40.712776, -74.005974], 5);  // Default view
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            $('#locationForm').on('submit', function(e) {
+                e.preventDefault();
+                const currentLocation = $('#currentLocation').val();
+
+                $.ajax({
+                    url: '/nearest_hospital',
+                    type: 'GET',
+                    data: { current_location: currentLocation },
+                    success: function(response) {
+                        $('#result').html(
+                            `<div class="alert alert-success">
+                                Nearest Hospital: Node ${response.nearest_hospital} <br>
+                                Distance: ${response.distance}
+                            </div>`
+                        );
+
+                        var currentCoords = response.current_coordinates;
+                        var hospitalCoords = response.hospital_coordinates;
+
+                        map.setView(currentCoords, 5);
+
+                        L.marker(currentCoords).addTo(map)
+                            .bindPopup("Current Location")
+                            .openPopup();
+
+                        L.marker(hospitalCoords).addTo(map)
+                            .bindPopup("Nearest Hospital")
+                            .openPopup();
+
+                        animateAmbulance(currentCoords, hospitalCoords);
+                    },
+                    error: function(xhr) {
+                        $('#result').html(
+                            `<div class="alert alert-danger">
+                                Error: ${xhr.responseJSON.error}
+                            </div>`
+                        );
+                    }
+                });
+            });
+
+            function animateAmbulance(startCoords, endCoords) {
+                var ambulanceIcon = L.divIcon({className: 'ambulance-icon'});
+                var marker = L.marker(startCoords, {icon: ambulanceIcon}).addTo(map);
+
+                var latlngs = [
+                    startCoords,
+                    endCoords
+                ];
+
+                var polyline = L.polyline(latlngs, {color: 'blue'}).addTo(map);
+
+                var i = 0;
+                var interval = setInterval(function() {
+                    marker.setLatLng(latlngs[i]);
+                    i++;
+                    if (i >= latlngs.length) {
+                        clearInterval(interval);
+                    }
+                }, 1000);  // Change the interval value to adjust the speed
+            }
+        });
+    </script>
+</body>
+</html>
